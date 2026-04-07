@@ -2,7 +2,7 @@ import "./App.css"
 import {Editor} from "@monaco-editor/react"
 import { MonacoBinding } from "y-monaco"
 import * as Y from "yjs"
-import { useRef,useMemo,useState } from "react"
+import { useRef,useMemo,useState,useEffect, use } from "react"
 import {SocketIOProvider} from "y-socket.io"
 
 
@@ -14,17 +14,14 @@ function App() {
     return new URLSearchParams(window.location.search).get("username") || ""
   })
 
+    const [ users, setUsers ] = useState([])
+
   const ydoc = useMemo(() => new Y.Doc(), []);
   const yText = useMemo(() => ydoc.getText("monaco"), [ydoc]);
   
 
   const handleMount = (editor) => {
     editorRef.current = editor;
-
-    const provider = new SocketIOProvider("http://localhost:3000", "monaco", ydoc,{autoConnect: true})
-    const monacoBinding = new MonacoBinding(yText, editorRef.current.getModel(), new Set([editorRef.current]), provider.awareness)
-
-   
   }
 
     const handleJoin = (e) => {
@@ -33,6 +30,23 @@ function App() {
      window.history.pushState({}, "", "?username=" + e.target.username.value)
 
   }
+
+
+  useEffect(() => {
+    if (editorRef.current && username) {
+      const provider = new SocketIOProvider("http://localhost:3000", "monaco", ydoc,{autoConnect: true,})
+      provider.awareness.setLocalStateField("user", {
+        // name: username,
+        // color: "#" + Math.floor(Math.random() * 16777215).toString(16)
+        username
+      })
+      provider.awareness.on("change", () => {
+        const states = Array.from(provider.awareness.getStates().values())
+        setUsers(states.map(state => state.user).filter(user => Boolean(user.username)) )
+      } )
+      const monacoBinding = new MonacoBinding(yText, editorRef.current.getModel(), new Set([editorRef.current]), provider.awareness)
+    }
+  }, [editorRef,current,username])
 
 
    if (!username) {
